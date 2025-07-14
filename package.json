@@ -1,0 +1,72 @@
+{
+  "name": "synthgen",
+  "version": "1.0.0",
+  "description": "Synthetic data generation tool using SDV library",
+  "main": "public/main.js",
+  "homepage": "./",
+  "scripts": {
+    "start": "npm run build && electron .",
+    "electron": "electron .",
+    "electron-dev": "concurrently \"npm run react-start\" \"wait-on http://localhost:3000 && ELECTRON_IS_DEV=true electron .\"",
+    "build": "react-scripts build",
+    "react-start": "react-scripts start",
+    "test": "react-scripts test",
+    "eject": "react-scripts eject",
+    "electron-pack": "electron-builder",
+    "preelectron-pack": "npm run build",
+    "setup-python": "python3 -m pip install --user sdv pandas numpy matplotlib seaborn"
+  },
+  "keywords": [
+    "synthetic-data",
+    "sdv",
+    "electron",
+    "react",
+    "privacy"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@emotion/react": "^11.11.1",
+    "@emotion/styled": "^11.11.0",
+    "@mui/icons-material": "^5.14.19",
+    "@mui/material": "^5.14.20",
+    "csv-parser": "^3.0.0",
+    "electron-store": "^8.1.0",
+    "jszip": "^3.10.1",
+    "papaparse": "^5.4.1",
+    "python-shell": "^5.0.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-scripts": "5.0.1",
+    "recharts": "^2.8.0"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "electron": "^37.2.1",
+    "electron-builder": "^24.6.4",
+    "wait-on": "^7.0.1"
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  },
+  "build": {
+    "extraResources": [
+      {
+        "from": "python",
+        "to": "python",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ]
+  }
+}
