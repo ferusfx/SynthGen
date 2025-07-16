@@ -46,11 +46,10 @@ function createWindow() {
   
   if (isDev) {
     mainWindow.loadURL('http://localhost:3000');
-    mainWindow.webContents.openDevTools();
+    // mainWindow.webContents.openDevTools(); // Disabled dev tools
   } else {
     mainWindow.loadFile(path.join(__dirname, '../build/index.html'));
-    // Enable dev tools in production too for debugging
-    mainWindow.webContents.openDevTools();
+    // mainWindow.webContents.openDevTools(); // Disabled dev tools in production
   }
 }
 
@@ -65,6 +64,79 @@ app.on('window-all-closed', () => {
 app.on('activate', () => {
   if (BrowserWindow.getAllWindows().length === 0) {
     createWindow();
+  }
+});
+
+// Show save dialog for ZIP file
+ipcMain.handle('show-save-dialog', async (event, options) => {
+  try {
+    const result = await dialog.showSaveDialog(options);
+    return result;
+  } catch (error) {
+    return { canceled: true, error: error.message };
+  }
+});
+
+// Get generated files list
+ipcMain.handle('get-generated-files', async () => {
+  try {
+    const generatedPath = path.join(process.cwd(), 'test', 'generated');
+    
+    if (!fs.existsSync(generatedPath)) {
+      return { success: false, error: 'Generated files folder not found' };
+    }
+    
+    const files = fs.readdirSync(generatedPath)
+      .filter(file => file.endsWith('.csv'))
+      .map(file => ({
+        name: file,
+        path: path.join(generatedPath, file)
+      }));
+    
+    return { success: true, files };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+// Create ZIP from generated files
+ipcMain.handle('create-zip-from-files', async (event, files, outputPath) => {
+  try {
+    const archiver = require('archiver');
+    const output = fs.createWriteStream(outputPath);
+    const archive = archiver('zip', { zlib: { level: 9 } });
+    
+    return new Promise((resolve, reject) => {
+      output.on('close', () => {
+        resolve({ success: true, size: archive.pointer() });
+      });
+      
+      archive.on('error', (err) => {
+        resolve({ success: false, error: err.message });
+      });
+      
+      archive.pipe(output);
+      
+      // Add each file to the archive
+      files.forEach(file => {
+        archive.file(file.path, { name: file.name });
+      });
+      
+      archive.finalize();
+    });
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+// Save ZIP file from blob
+ipcMain.handle('save-zip-file', async (event, zipBlob, outputPath) => {
+  try {
+    const buffer = Buffer.from(await zipBlob.arrayBuffer());
+    fs.writeFileSync(outputPath, buffer);
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: error.message };
   }
 });
 
@@ -199,6 +271,17 @@ ipcMain.handle('python-evaluate-quality', async (event, files, syntheticData) =>
       return { success: false, error: 'Python bridge not initialized' };
     }
     return await pythonBridge.evaluateQuality(files, syntheticData);
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('python-generate-column-plot', async (event, files, syntheticData, columnName) => {
+  try {
+    if (!pythonBridge) {
+      return { success: false, error: 'Python bridge not initialized' };
+    }
+    return await pythonBridge.generateColumnPlotData(files, syntheticData, columnName);
   } catch (error) {
     return { success: false, error: error.message };
   }

@@ -32,6 +32,7 @@ const FileSelector = ({ onFilesSelected, isProcessing }) => {
         return;
       }
       const result = await window.electronAPI.selectFiles();
+      console.log('File selection result:', result);
       if (result && result.length > 0) {
         // Files now come with name and size already populated from main process
         setSelectedFiles(prev => [...prev, ...result]);
@@ -61,7 +62,7 @@ const FileSelector = ({ onFilesSelected, isProcessing }) => {
     setSelectedFiles(prev => prev.filter((_, i) => i !== index));
   }, []);
 
-  const handleDrop = useCallback((e) => {
+  const handleDrop = useCallback(async (e) => {
     e.preventDefault();
     setDragOver(false);
     
@@ -70,11 +71,23 @@ const FileSelector = ({ onFilesSelected, isProcessing }) => {
     );
     
     if (files.length > 0) {
+      // Check if any files are missing path property
+      const filesWithoutPath = files.filter(file => !file.path);
+      
+      if (filesWithoutPath.length > 0) {
+        // Show error message for drag and drop limitation
+        console.error('Drag and drop files are missing path property. Please use the file selection button instead.');
+        alert('Drag and drop is not fully supported. Please use the "Select CSV Files" button to choose your files.');
+        return;
+      }
+      
+      // All files have path property, proceed normally
       const newFiles = files.map(file => ({
         path: file.path,
         name: file.name,
         size: file.size
       }));
+      console.log('Drag and drop files:', newFiles);
       setSelectedFiles(prev => [...prev, ...newFiles]);
     }
   }, []);
@@ -90,6 +103,8 @@ const FileSelector = ({ onFilesSelected, isProcessing }) => {
 
   const handleProceed = useCallback(() => {
     if (selectedFiles.length > 0) {
+      // Debug: Log selected files before passing
+      console.log('FileSelector handleProceed called with selectedFiles:', selectedFiles);
       onFilesSelected(selectedFiles);
     }
   }, [selectedFiles, onFilesSelected]);
@@ -131,10 +146,13 @@ const FileSelector = ({ onFilesSelected, isProcessing }) => {
       >
         <UploadIcon sx={{ fontSize: 48, color: '#667eea', mb: 2 }} />
         <Typography variant="h6" sx={{ mb: 1 }}>
-          Drop CSV files here or click to browse
+          Click to browse for CSV files
         </Typography>
         <Typography variant="body2" sx={{ color: '#666' }}>
           Supports multiple file selection
+        </Typography>
+        <Typography variant="body2" sx={{ color: '#999', mt: 1, fontSize: '0.8rem' }}>
+          Note: Use the buttons below for reliable file selection
         </Typography>
       </Paper>
 

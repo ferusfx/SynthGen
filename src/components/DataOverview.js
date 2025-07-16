@@ -24,7 +24,7 @@ import {
 
 // Python operations handled via electron API
 
-const DataOverview = ({ files, onDataAnalyzed, setIsProcessing }) => {
+const DataOverview = ({ files, onDataAnalyzed, onComplete, setIsProcessing }) => {
   const [analysisData, setAnalysisData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -39,6 +39,21 @@ const DataOverview = ({ files, onDataAnalyzed, setIsProcessing }) => {
     setError(null);
 
     try {
+      // Debug: Log the files parameter
+      console.log('DataOverview analyzeFiles called with files:', files);
+      
+      // Check if files are valid
+      if (!files || !Array.isArray(files) || files.length === 0) {
+        throw new Error('No files selected for analysis');
+      }
+      
+      // Check if files have the required path property
+      for (let i = 0; i < files.length; i++) {
+        if (!files[i] || !files[i].path) {
+          throw new Error(`File ${i} is missing path property`);
+        }
+      }
+
       // Check Python environment first
       const pythonCheck = await window.electronAPI.pythonCheckSetup();
       console.log('Python check result:', pythonCheck);
@@ -85,7 +100,172 @@ const DataOverview = ({ files, onDataAnalyzed, setIsProcessing }) => {
 
   const formatSampleData = (sampleData) => {
     if (!sampleData || sampleData.length === 0) return [];
-    return sampleData.slice(0, 3); // Show first 3 rows
+    return sampleData.slice(0, 5); // Show first 5 rows
+  };
+
+  const renderMetadataSummary = (metadataSummary) => {
+    if (!metadataSummary) return null;
+
+    const getSDTypeColor = (sdtype) => {
+      switch (sdtype) {
+        case 'categorical': return 'info';
+        case 'numerical': return 'success';
+        case 'boolean': return 'warning';
+        case 'datetime': return 'secondary';
+        case 'id': return 'error';
+        default: return 'default';
+      }
+    };
+
+    const getSDTypeIcon = (sdtype) => {
+      switch (sdtype) {
+        case 'categorical': return '🏷️';
+        case 'numerical': return '🔢';
+        case 'boolean': return '✅';
+        case 'datetime': return '📅';
+        case 'id': return '🔑';
+        default: return '❓';
+      }
+    };
+
+    return (
+      <Box>
+        {/* Column Types Overview */}
+        <Paper sx={{ p: 2, mb: 2, bgcolor: '#f8f9fa' }}>
+          <Typography variant="subtitle2" gutterBottom sx={{ fontWeight: 'bold' }}>
+            Column Types Detected by SDV
+          </Typography>
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+            {Object.entries(metadataSummary.column_types || {}).map(([sdtype, columns]) => (
+              <Chip
+                key={sdtype}
+                label={`${getSDTypeIcon(sdtype)} ${sdtype} (${columns.length})`}
+                color={getSDTypeColor(sdtype)}
+                variant="outlined"
+                size="small"
+              />
+            ))}
+          </Box>
+        </Paper>
+
+        {/* Detailed Column Information */}
+        <TableContainer component={Paper} variant="outlined">
+          <Table size="small">
+            <TableHead>
+              <TableRow>
+                <TableCell><strong>Column</strong></TableCell>
+                <TableCell><strong>SDV Type</strong></TableCell>
+                <TableCell><strong>Pandas Type</strong></TableCell>
+                <TableCell align="right"><strong>Unique</strong></TableCell>
+                <TableCell align="right"><strong>Nulls</strong></TableCell>
+                <TableCell><strong>Sample Values</strong></TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {Object.entries(metadataSummary.column_details || {}).map(([columnName, details]) => (
+                <TableRow key={columnName}>
+                  <TableCell>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      {details.is_primary_key && <Chip label="PK" size="small" color="error" />}
+                      {columnName}
+                    </Box>
+                  </TableCell>
+                  <TableCell>
+                    <Chip
+                      label={`${getSDTypeIcon(details.sdtype)} ${details.sdtype}`}
+                      size="small"
+                      color={getSDTypeColor(details.sdtype)}
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <Chip
+                      label={details.pandas_dtype}
+                      size="small"
+                      color={getDataTypeColor(details.pandas_dtype)}
+                    />
+                  </TableCell>
+                  <TableCell align="right">{details.unique_values}</TableCell>
+                  <TableCell align="right">
+                    {details.null_count > 0 ? (
+                      <Chip label={details.null_count} size="small" color="warning" />
+                    ) : (
+                      <Chip label="0" size="small" color="success" />
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    <Typography variant="body2" sx={{ fontSize: '0.75rem' }}>
+                      {details.sample_values?.slice(0, 3).join(', ')}
+                      {details.sample_values?.length > 3 && '...'}
+                    </Typography>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </TableContainer>
+
+        {/* Data Quality Summary */}
+        {metadataSummary.data_quality && (
+          <Paper sx={{ p: 2, mt: 2, bgcolor: '#f0f8ff' }}>
+            <Typography variant="subtitle2" gutterBottom sx={{ fontWeight: 'bold' }}>
+              Data Quality Assessment
+            </Typography>
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
+              <Chip 
+                label={`${metadataSummary.total_rows} rows`} 
+                size="small" 
+                color="primary"
+                variant="outlined"
+              />
+              <Chip 
+                label={`${metadataSummary.total_columns} columns`} 
+                size="small" 
+                color="primary"
+                variant="outlined"
+              />
+              <Chip 
+                label={`${metadataSummary.data_quality.duplicate_rows} duplicates`} 
+                size="small" 
+                color={metadataSummary.data_quality.duplicate_rows > 0 ? "warning" : "success"}
+                variant="outlined"
+              />
+            </Box>
+          </Paper>
+        )}
+
+        {/* Validation Results */}
+        {metadataSummary.metadata_validation && (
+          <Paper sx={{ p: 2, mt: 2, bgcolor: metadataSummary.metadata_validation.valid ? '#f0f8f0' : '#fff0f0' }}>
+            <Typography variant="subtitle2" gutterBottom sx={{ fontWeight: 'bold' }}>
+              Metadata Validation
+            </Typography>
+            <Chip 
+              label={metadataSummary.metadata_validation.valid ? "Valid" : "Issues Found"}
+              size="small"
+              color={metadataSummary.metadata_validation.valid ? "success" : "error"}
+            />
+            {metadataSummary.metadata_validation.issues?.length > 0 && (
+              <Box sx={{ mt: 1 }}>
+                {metadataSummary.metadata_validation.issues.map((issue, index) => (
+                  <Alert key={index} severity="error" sx={{ mt: 1 }}>
+                    {issue}
+                  </Alert>
+                ))}
+              </Box>
+            )}
+            {metadataSummary.metadata_validation.warnings?.length > 0 && (
+              <Box sx={{ mt: 1 }}>
+                {metadataSummary.metadata_validation.warnings.map((warning, index) => (
+                  <Alert key={index} severity="warning" sx={{ mt: 1 }}>
+                    {warning}
+                  </Alert>
+                ))}
+              </Box>
+            )}
+          </Paper>
+        )}
+      </Box>
+    );
   };
 
   if (loading) {
@@ -168,81 +348,52 @@ const DataOverview = ({ files, onDataAnalyzed, setIsProcessing }) => {
           </AccordionSummary>
           
           <AccordionDetails>
-            <Box sx={{ mb: 3 }}>
-              <Typography variant="subtitle1" gutterBottom sx={{ fontWeight: 'bold' }}>
-                Column Information
-              </Typography>
-              
-              <TableContainer component={Paper} variant="outlined">
-                <Table size="small">
-                  <TableHead>
-                    <TableRow>
-                      <TableCell><strong>Column Name</strong></TableCell>
-                      <TableCell><strong>Data Type</strong></TableCell>
-                      <TableCell align="right"><strong>Unique Values</strong></TableCell>
-                      <TableCell align="right"><strong>Null Count</strong></TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {tableData.columns.map((column) => (
-                      <TableRow key={column}>
-                        <TableCell>{column}</TableCell>
-                        <TableCell>
-                          <Chip
-                            label={tableData.dtypes[column]}
-                            size="small"
-                            color={getDataTypeColor(tableData.dtypes[column])}
-                          />
-                        </TableCell>
-                        <TableCell align="right">
-                          {tableData.unique_counts[column].toLocaleString()}
-                        </TableCell>
-                        <TableCell align="right">
-                          {tableData.null_counts[column] > 0 ? (
-                            <Chip
-                              label={tableData.null_counts[column]}
-                              size="small"
-                              color="warning"
-                            />
-                          ) : (
-                            <Chip
-                              label="0"
-                              size="small"
-                              color="success"
-                            />
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </TableContainer>
-            </Box>
+
+            {/* Metadata Summary Section */}
+            {analysisData._metadata && analysisData._metadata.metadata_summary && (
+              <Box sx={{ mb: 3 }}>
+                <Typography variant="subtitle1" gutterBottom sx={{ fontWeight: 'bold' }}>
+                  SDV Metadata Detection Summary
+                </Typography>
+                {renderMetadataSummary(analysisData._metadata.metadata_summary)}
+              </Box>
+            )}
 
             {tableData.sample_data && tableData.sample_data.length > 0 && (
               <Box>
                 <Typography variant="subtitle1" gutterBottom sx={{ fontWeight: 'bold' }}>
-                  Sample Data (First 3 Rows)
+                  Data Preview (First 5 Rows)
                 </Typography>
                 
-                <TableContainer component={Paper} variant="outlined">
-                  <Table size="small">
+                <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 400 }}>
+                  <Table size="small" stickyHeader>
                     <TableHead>
                       <TableRow>
+                        <TableCell sx={{ minWidth: 60, bgcolor: '#f5f5f5', fontWeight: 'bold' }}>
+                          #
+                        </TableCell>
                         {tableData.columns.map((column) => (
-                          <TableCell key={column}><strong>{column}</strong></TableCell>
+                          <TableCell key={column} sx={{ minWidth: 120, bgcolor: '#f5f5f5', fontWeight: 'bold' }}>
+                            {column}
+                          </TableCell>
                         ))}
                       </TableRow>
                     </TableHead>
                     <TableBody>
-                      {formatSampleData(tableData.sample_data).map((row, rowIndex) => (
-                        <TableRow key={rowIndex}>
+                      {formatSampleData(tableData.sample_data).slice(0, 5).map((row, rowIndex) => (
+                        <TableRow key={rowIndex} sx={{ '&:nth-of-type(odd)': { bgcolor: '#fafafa' } }}>
+                          <TableCell sx={{ bgcolor: '#f8f9fa', fontWeight: 'bold', color: '#666' }}>
+                            {rowIndex + 1}
+                          </TableCell>
                           {tableData.columns.map((column) => (
-                            <TableCell key={column}>
-                              {String(row[column] || '').length > 50 
-                                ? String(row[column]).substring(0, 50) + '...'
-                                : String(row[column] || 'null')
-                              }
+                            <TableCell key={column} sx={{ fontFamily: 'monospace', fontSize: '0.875rem' }}>
+                              {(() => {
+                                const value = row[column];
+                                if (value === null || value === undefined) return 'null';
+                                if (typeof value === 'boolean') return value ? 'TRUE' : 'FALSE';
+                                const strValue = String(value);
+                                return strValue.length > 30 ? strValue.substring(0, 30) + '...' : strValue;
+                              })()}
                             </TableCell>
                           ))}
                         </TableRow>
@@ -325,6 +476,18 @@ const DataOverview = ({ files, onDataAnalyzed, setIsProcessing }) => {
           )}
         </Alert>
       )}
+
+      {/* Continue Button */}
+      <Box sx={{ mt: 4, display: 'flex', justifyContent: 'center' }}>
+        <Button
+          variant="contained"
+          size="large"
+          onClick={onComplete}
+          sx={{ px: 4 }}
+        >
+          Continue to Next Step
+        </Button>
+      </Box>
     </Box>
   );
 };

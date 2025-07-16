@@ -52,13 +52,34 @@ const Sidebar = ({ steps, currentStep, onStepClick, isProcessing }) => {
       >
         {steps.map((step, index) => {
           const StepIcon = stepIcons[index];
+          const isActive = index === currentStep;
+          const isCompleted = index < currentStep;
+          const isDisabled = index > currentStep;
+          
           return (
             <Step key={index}>
               <StepLabel
                 sx={{
                   cursor: !isProcessing && index <= currentStep ? 'pointer' : 'default',
+                  backgroundColor: isActive ? 'rgba(102, 126, 234, 0.1)' : 'transparent',
+                  borderRadius: '8px',
+                  padding: '8px 12px',
+                  margin: '4px 0',
+                  transition: 'all 0.2s ease',
+                  border: isActive ? '2px solid #667eea' : '2px solid transparent',
                   '& .MuiStepLabel-label': {
-                    fontWeight: index === currentStep ? 'bold' : 'normal'
+                    fontWeight: isActive ? 'bold' : isCompleted ? '600' : 'normal',
+                    color: isActive ? '#667eea' : isCompleted ? '#2e7d32' : isDisabled ? '#999' : 'inherit',
+                    fontSize: isActive ? '1rem' : '0.875rem'
+                  },
+                  '& .MuiStepLabel-iconContainer': {
+                    '& .MuiSvgIcon-root': {
+                      color: isActive ? '#667eea' : isCompleted ? '#2e7d32' : isDisabled ? '#ccc' : 'inherit',
+                      fontSize: isActive ? '1.5rem' : '1.25rem'
+                    }
+                  },
+                  '&:hover': {
+                    backgroundColor: index <= currentStep ? 'rgba(102, 126, 234, 0.05)' : 'transparent'
                   }
                 }}
                 onClick={() => !isProcessing && index <= currentStep && onStepClick(index)}

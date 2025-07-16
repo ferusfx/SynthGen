@@ -25,8 +25,8 @@ print(json.dumps(result))
 
       const execFile = util.promisify(cp.execFile);
       const timeout = setTimeout(() => {
-        resolve({ success: false, error: 'CSV load timed out after 15 seconds' });
-      }, 15000);
+        resolve({ success: false, error: 'CSV load timed out after 30 seconds' });
+      }, 30000);
 
       execFile(this.pythonExecutable, ['-c', script])
         .then(({ stdout, stderr }) => {
@@ -47,6 +47,23 @@ print(json.dumps(result))
 
   async analyzeData(files) {
     return new Promise((resolve, reject) => {
+      // Debug: Log the files parameter
+      console.log('analyzeData called with files:', files);
+      
+      // Validate files parameter
+      if (!files || !Array.isArray(files) || files.length === 0) {
+        resolve({ error: 'No files provided for analysis' });
+        return;
+      }
+      
+      // Check if files have the required path property
+      for (let i = 0; i < files.length; i++) {
+        if (!files[i] || !files[i].path) {
+          resolve({ error: `File ${i} is missing path property` });
+          return;
+        }
+      }
+      
       const script = `
 import sys
 import json
@@ -115,6 +132,23 @@ print(json.dumps(results))
 
   async generateSyntheticData(files, relationships = [], numRows = null, progressCallback = null) {
     return new Promise((resolve, reject) => {
+      // Debug: Log the files parameter
+      console.log('generateSyntheticData called with files:', files);
+      
+      // Validate files parameter
+      if (!files || !Array.isArray(files) || files.length === 0) {
+        resolve({ success: false, error: 'No files provided for synthesis' });
+        return;
+      }
+      
+      // Check if files have the required path property
+      for (let i = 0; i < files.length; i++) {
+        if (!files[i] || !files[i].path) {
+          resolve({ success: false, error: `File ${i} is missing path property` });
+          return;
+        }
+      }
+      
       const script = `
 import sys
 import json
@@ -135,6 +169,21 @@ processor.setup_metadata(relationships)
 # Generate synthetic data
 try:
     result = processor.generate_synthetic_data(${numRows || 'None'})
+    
+    # Auto-save to test/generated folder for debugging
+    if result['success']:
+        import os
+        os.makedirs('./test/generated', exist_ok=True)
+        
+        # Debug: Check the raw data before export
+        for table_name, table_data in result['data'].items():
+            print(f"Debug: Table {table_name} first row: {table_data[0]}")
+            print(f"Debug: Table {table_name} is_round values: {[row.get('is_round', 'MISSING') for row in table_data[:5]]}")
+        
+        export_result = processor.export_synthetic_data_csv(result['data'], './test/generated')
+        print(f"Debug: Auto-saved CSV files to ./test/generated")
+        print(f"Debug: Export result: {export_result}")
+    
     print(json.dumps(result))
 except Exception as e:
     print(json.dumps({'success': False, 'error': str(e)}))
@@ -160,8 +209,30 @@ except Exception as e:
           }
           
           try {
-            const data = JSON.parse(stdout);
-            resolve(data);
+            // Filter out debug output lines and get only the JSON result
+            const lines = stdout.trim().split('\n');
+            let jsonResult = null;
+            
+            // Look for the last line that starts with { (our JSON result)
+            for (let i = lines.length - 1; i >= 0; i--) {
+              const line = lines[i].trim();
+              if (line.startsWith('{')) {
+                try {
+                  jsonResult = JSON.parse(line);
+                  break;
+                } catch (e) {
+                  // Continue looking for valid JSON
+                  continue;
+                }
+              }
+            }
+            
+            if (jsonResult) {
+              resolve(jsonResult);
+            } else {
+              console.error('No valid JSON found in output:', stdout);
+              resolve({ success: false, error: 'No valid JSON result found in generation output' });
+            }
           } catch (parseErr) {
             console.error('JSON parse error:', parseErr);
             console.error('Python output:', stdout);
@@ -351,8 +422,8 @@ print("Package check complete")
 
     const timeout = setTimeout(() => {
       console.log('Package check with execFile timed out');
-      resolve({ ready: false, error: 'Package check timed out after 15 seconds' });
-    }, 15000);
+      resolve({ ready: false, error: 'Package check timed out after 30 seconds' });
+    }, 30000);
 
     execFile(this.pythonExecutable, ['-c', script])
       .then(({ stdout, stderr }) => {
@@ -388,6 +459,105 @@ print("Package check complete")
     // This method is deprecated, redirect to execFile method
     console.log(`Redirecting deprecated checkPythonPackages to checkPythonPackagesWithExecFile...`);
     this.checkPythonPackagesWithExecFile(resolve);
+  }
+
+  async generateColumnPlotData(files, syntheticData, columnName) {
+    return new Promise((resolve, reject) => {
+      // Debug: Log the parameters
+      console.log('generateColumnPlotData called with:', { files: files.length, columnName });
+      
+      // Validate parameters
+      if (!files || !Array.isArray(files) || files.length === 0) {
+        resolve({ success: false, error: 'No files provided for plot generation' });
+        return;
+      }
+      
+      if (!columnName) {
+        resolve({ success: false, error: 'No column name provided for plot generation' });
+        return;
+      }
+      
+      const script = `
+import sys
+import json
+sys.path.append('${this.pythonPath}')
+from data_processor import DataProcessor
+
+processor = DataProcessor()
+
+# Load all files
+${files.map((file, index) => `
+processor.load_csv('${file.path}', 'table_${index}')
+`).join('')}
+
+# Setup metadata
+processor.setup_metadata()
+
+# Generate plot data
+try:
+    import json as json_module
+    synthetic_data_json = '''${JSON.stringify(syntheticData).replace(/'/g, "\\'")}'''
+    synthetic_data_dict = json_module.loads(synthetic_data_json)
+    result = processor.generate_column_plot_data(synthetic_data_dict, '${columnName}')
+    print(json.dumps(result))
+except Exception as e:
+    print(json.dumps({'success': False, 'error': str(e)}))
+`;
+
+      // Add timeout to prevent hanging
+      const timeout = setTimeout(() => {
+        console.log('Column plot generation timed out');
+        resolve({ success: false, error: 'Column plot generation timed out after 2 minutes' });
+      }, 120000); // 2 minutes
+
+      const execFile = util.promisify(cp.execFile);
+      
+      execFile(this.pythonExecutable, ['-c', script])
+        .then(({ stdout, stderr }) => {
+          clearTimeout(timeout);
+          console.log('Column plot generation completed successfully');
+          
+          if (stderr) {
+            console.warn('Python stderr:', stderr);
+          }
+          
+          try {
+            // Filter out debug output lines and get only the JSON result
+            const lines = stdout.trim().split('\n');
+            let jsonResult = null;
+            
+            // Look for the last line that starts with { (our JSON result)
+            for (let i = lines.length - 1; i >= 0; i--) {
+              const line = lines[i].trim();
+              if (line.startsWith('{')) {
+                try {
+                  jsonResult = JSON.parse(line);
+                  break;
+                } catch (e) {
+                  // Continue looking for valid JSON
+                  continue;
+                }
+              }
+            }
+            
+            if (jsonResult) {
+              resolve(jsonResult);
+            } else {
+              console.error('No valid JSON found in output:', stdout);
+              resolve({ success: false, error: 'No valid JSON result found in plot generation output' });
+            }
+          } catch (parseErr) {
+            console.error('JSON parse error:', parseErr);
+            console.error('Python output:', stdout);
+            resolve({ success: false, error: `Failed to parse plot generation results: ${parseErr.message}` });
+          }
+        })
+        .catch((error) => {
+          clearTimeout(timeout);
+          console.error('Column plot generation failed:', error);
+          resolve({ success: false, error: `Column plot generation failed: ${error.message}` });
+        });
+    });
   }
 }
 

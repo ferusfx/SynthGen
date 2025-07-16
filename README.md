@@ -13,8 +13,10 @@ SynthGen is a comprehensive Electron-based desktop application that generates hi
 - **Multi-Format Support**: Handles CSV files with automatic delimiter detection
 - **Dual Synthesis Modes**: Single-table (Gaussian Copula) and multi-table (HMA) synthesis
 - **Auto-Metadata Detection**: Intelligent column type and relationship detection
-- **Quality Assessment**: Comprehensive quality metrics and privacy evaluation
-- **Export Flexibility**: Download synthetic data as CSV/ZIP or quality reports as JSON
+- **Advanced Quality Assessment**: Comprehensive quality metrics, privacy evaluation, and SDV diagnostics
+- **Data Visualization**: Real vs synthetic data comparison charts with column-level analysis
+- **Export Flexibility**: Download synthetic data as CSV/ZIP or detailed quality reports as JSON
+- **Interactive Quality Metrics**: Contextual tooltips and detailed explanations for all scores
 - **Privacy-First**: Generate synthetic data without exposing original sensitive information
 - **Cross-Platform**: Desktop application for Windows, macOS, and Linux
 
@@ -261,6 +263,9 @@ app/
 5. **Quality Report**
    ```
    Metrics: Statistical fidelity, privacy protection, utility scores
+   SDV Diagnostics: Data validity and structure analysis with column-level details
+   Visualization: Real vs synthetic data comparison charts
+   Interactive Help: Click info icons for detailed metric explanations
    Downloads: Synthetic dataset (CSV/ZIP), quality report (JSON)
    ```
 
@@ -378,7 +383,7 @@ npm run setup-python
 # Development mode (hot reload)
 npm run electron-dev
 
-# Production build
+# Production build and start
 npm run build
 npm start
 
@@ -387,6 +392,12 @@ npm run electron-pack
 
 # Run tests
 npm test
+
+# Build only (without starting)
+npm run build
+
+# Start without building
+npx electron .
 ```
 
 ### Adding New Synthesis Algorithms

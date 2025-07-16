@@ -43,16 +43,23 @@ function App() {
   ];
 
   const handleFilesSelected = useCallback((selectedFiles) => {
+    // Debug: Log files being set in App
+    console.log('App handleFilesSelected called with selectedFiles:', selectedFiles);
     setFiles(selectedFiles);
     setCurrentStep(1);
   }, []);
 
   const handleDataAnalyzed = useCallback((overview) => {
     setDataOverview(overview);
+    // Stay on Data Overview step to show analysis results
+    setCurrentStep(1);
+  }, []);
+
+  const handleDataOverviewComplete = useCallback(() => {
     if (files.length > 1) {
-      setCurrentStep(2);
+      setCurrentStep(2); // Go to relationships mapping
     } else {
-      setCurrentStep(3);
+      setCurrentStep(3); // Skip to Generate Data for single file
     }
   }, [files.length]);
 
@@ -84,6 +91,7 @@ function App() {
           <DataOverview
             files={files}
             onDataAnalyzed={handleDataAnalyzed}
+            onComplete={handleDataOverviewComplete}
             setIsProcessing={setIsProcessing}
           />
         );

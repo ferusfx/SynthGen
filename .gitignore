@@ -160,6 +160,12 @@ local/
 scratch/
 test-data/
 
+# Test and help folders
+test/
+help/
+test_*.py
+test_*.js
+
 # Python bytecode and cache
 *.pyc
 *.pyo

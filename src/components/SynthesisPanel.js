@@ -112,7 +112,15 @@ const SynthesisPanel = ({ files, dataOverview, columnMappings, onSynthesisComple
       const csvContent = [
         headers.join(delimiter),
         ...data.map(row => headers.map(header => {
-          const value = row[header] || '';
+          const value = row[header];
+          // Handle null/undefined values
+          if (value === null || value === undefined) {
+            return '';
+          }
+          // Convert boolean values to proper string representation
+          if (typeof value === 'boolean') {
+            return value ? 'True' : 'False';
+          }
           // Escape values that contain the delimiter, quotes, or newlines
           if (typeof value === 'string' && (
             value.includes(delimiter) || 
@@ -208,6 +216,7 @@ const SynthesisPanel = ({ files, dataOverview, columnMappings, onSynthesisComple
       </CardContent>
     </Card>
   );
+
 
   const renderProgress = () => (
     <Card sx={{ mb: 3 }}>
