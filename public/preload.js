@@ -14,10 +14,23 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Python operations
   pythonCheckSetup: () => ipcRenderer.invoke('python-check-setup'),
   pythonAnalyzeData: (files) => ipcRenderer.invoke('python-analyze-data', files),
-  pythonGenerateSynthetic: (files, relationships, numRows) => 
-    ipcRenderer.invoke('python-generate-synthetic', files, relationships, numRows),
+  pythonGenerateSynthetic: (files, relationships, numRows, algorithm) => 
+    ipcRenderer.invoke('python-generate-synthetic', files, relationships, numRows, algorithm),
   pythonEvaluateQuality: (files, syntheticData) => 
     ipcRenderer.invoke('python-evaluate-quality', files, syntheticData),
   pythonGenerateColumnPlot: (files, syntheticData, columnName) => 
     ipcRenderer.invoke('python-generate-column-plot', files, syntheticData, columnName),
+  
+  // Progress monitoring
+  startProgressPolling: (callback) => {
+    ipcRenderer.on('generation-progress', (event, progressData) => {
+      callback(progressData);
+    });
+  },
+  stopProgressPolling: () => {
+    ipcRenderer.removeAllListeners('generation-progress');
+  },
+  
+  // Logging
+  logToTerminal: (message) => ipcRenderer.invoke('log-to-terminal', message),
 });

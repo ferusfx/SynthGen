@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   Box,
   Typography,
@@ -8,10 +8,6 @@ import {
   Card,
   CardContent,
   TextField,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
   Alert,
   Chip,
   Grid,
@@ -35,11 +31,23 @@ import {
 // Python operations handled via electron API
 
 const SynthesisPanel = ({ files, dataOverview, columnMappings, onSynthesisComplete, setIsProcessing }) => {
-  const [generationParams, setGenerationParams] = useState({
-    numRows: '',
-    preserveRelationships: true,
-    algorithm: 'GaussianCopula'
-  });
+  // Separate state for algorithm to avoid complex state interactions
+  const [algorithm, setAlgorithm] = useState('GaussianCopula');
+  const [numRows, setNumRows] = useState('');
+  const [preserveRelationships, setPreserveRelationships] = useState(true);
+
+  // Update algorithm when file count changes
+  useEffect(() => {
+    const newAlgorithm = files && files.length === 1 ? 'GaussianCopula' : 'HMA';
+    setAlgorithm(newAlgorithm);
+  }, [files]);
+
+  // Create generationParams object when needed
+  const generationParams = {
+    numRows,
+    preserveRelationships,
+    algorithm
+  };
   const [generating, setGenerating] = useState(false);
   const [progress, setProgress] = useState(0);
   const [progressMessage, setProgressMessage] = useState('');
@@ -56,33 +64,40 @@ const SynthesisPanel = ({ files, dataOverview, columnMappings, onSynthesisComple
     setResult(null);
 
     try {
-      // Simulate progress updates
-      const progressCallback = (percent, message) => {
-        setProgress(percent);
-        setProgressMessage(message);
-      };
-
-      progressCallback(10, 'Setting up synthesizer...');
+      setProgress(10);
+      setProgressMessage('Setting up synthesizer...');
       
       // Determine number of rows to generate
       const numRows = generationParams.numRows ? 
         parseInt(generationParams.numRows) : 
         null; // Use original dataset size
 
-      progressCallback(20, 'Loading data files...');
+      setProgress(20);
+      setProgressMessage('Starting data generation...');
 
-      // Generate synthetic data
+      // Start progress polling for real-time updates
+      window.electronAPI.startProgressPolling((progressData) => {
+        setProgress(progressData.percent);
+        setProgressMessage(progressData.message);
+      });
+
+      // Generate synthetic data - the Python backend will handle progress updates
       const generationResult = await window.electronAPI.pythonGenerateSynthetic(
         files,
         columnMappings,
-        numRows
+        numRows,
+        generationParams.algorithm
       );
+
+      // Stop progress polling
+      window.electronAPI.stopProgressPolling();
 
       if (!generationResult.success) {
         throw new Error(generationResult.error);
       }
 
-      progressCallback(90, 'Finalizing results...');
+      setProgress(90);
+      setProgressMessage('Finalizing results...');
 
       // Process results
       const processedResult = {
@@ -94,11 +109,15 @@ const SynthesisPanel = ({ files, dataOverview, columnMappings, onSynthesisComple
 
       setResult(processedResult);
       onSynthesisComplete(processedResult);
-      progressCallback(100, 'Generation complete!');
+      
+      setProgress(100);
+      setProgressMessage('Generation complete!');
 
     } catch (err) {
       setError(err.message);
       setProgressMessage('Generation failed');
+      // Stop progress polling on error
+      window.electronAPI.stopProgressPolling();
     } finally {
       setGenerating(false);
       setIsProcessing(false);
@@ -154,7 +173,8 @@ const SynthesisPanel = ({ files, dataOverview, columnMappings, onSynthesisComple
     return dataOverview[tableName];
   };
 
-  const renderGenerationSettings = () => (
+  const renderGenerationSettings = () => {
+    return (
     <Card sx={{ mb: 3 }}>
       <CardContent>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
@@ -174,30 +194,44 @@ const SynthesisPanel = ({ files, dataOverview, columnMappings, onSynthesisComple
               fullWidth
               label="Number of Rows"
               type="number"
-              value={generationParams.numRows}
-              onChange={(e) => setGenerationParams(prev => ({
-                ...prev,
-                numRows: e.target.value
-              }))}
+              value={numRows}
+              onChange={(e) => setNumRows(e.target.value)}
               placeholder="Auto (same as original)"
               helperText="Leave empty to match original dataset size"
             />
           </Grid>
           <Grid item xs={12} md={4}>
-            <FormControl fullWidth>
-              <InputLabel>Algorithm</InputLabel>
-              <Select
-                value={generationParams.algorithm}
-                onChange={(e) => setGenerationParams(prev => ({
-                  ...prev,
-                  algorithm: e.target.value
-                }))}
+            <Box>
+              <Typography variant="body2" color="textSecondary" sx={{ mb: 1 }}>
+                Algorithm
+              </Typography>
+              <select
+                style={{
+                  width: '100%',
+                  padding: '16.5px 14px',
+                  fontSize: '16px',
+                  border: '1px solid rgba(0, 0, 0, 0.23)',
+                  borderRadius: '4px',
+                  backgroundColor: '#fff',
+                  cursor: 'pointer',
+                  fontFamily: 'inherit'
+                }}
+                value={algorithm}
+                onChange={(e) => {
+                  const newValue = e.target.value;
+                  setAlgorithm(newValue);
+                }}
               >
-                <MenuItem value="GaussianCopula">Gaussian Copula (Recommended)</MenuItem>
-                <MenuItem value="CTGAN">CTGAN (Deep Learning)</MenuItem>
-                <MenuItem value="TVAE">TVAE (Variational Autoencoder)</MenuItem>
-              </Select>
-            </FormControl>
+                {files && files.length === 1 ? (
+                  <>
+                    <option value="GaussianCopula">Gaussian Copula (Recommended)</option>
+                    <option value="CTGAN">CTGAN (Deep Learning)</option>
+                  </>
+                ) : (
+                  <option value="HMA">HMA (Multi-table)</option>
+                )}
+              </select>
+            </Box>
           </Grid>
           <Grid item xs={12} md={4}>
             <Box sx={{ pt: 2 }}>
@@ -208,14 +242,18 @@ const SynthesisPanel = ({ files, dataOverview, columnMappings, onSynthesisComple
                 }
               </Typography>
               <Typography variant="body2" color="textSecondary">
-                Tables: {files.length}
+                Tables: {files ? files.length : 0}
+              </Typography>
+              <Typography variant="body2" color="primary" sx={{ mt: 1 }}>
+                Current Algorithm: {algorithm}
               </Typography>
             </Box>
           </Grid>
         </Grid>
       </CardContent>
     </Card>
-  );
+    );
+  };
 
 
   const renderProgress = () => (
@@ -402,9 +440,16 @@ const SynthesisPanel = ({ files, dataOverview, columnMappings, onSynthesisComple
               <Grid item xs={12}>
                 <Alert severity="info">
                   <Typography variant="body2">
-                    <strong>Gaussian Copula:</strong> Best for mixed data types with complex correlations<br/>
-                    <strong>CTGAN:</strong> Deep learning approach, good for tabular data<br/>
-                    <strong>TVAE:</strong> Variational autoencoder, handles categorical data well
+                    {files && files.length === 1 ? (
+                      <>
+                        <strong>Gaussian Copula:</strong> Best for mixed data types with complex correlations<br/>
+                        <strong>CTGAN:</strong> Deep learning approach using GANs, excellent for tabular data but requires more computational resources
+                      </>
+                    ) : (
+                      <>
+                        <strong>HMA (Hierarchical Multi-table Algorithm):</strong> Best for related tables with foreign key relationships and complex data ecosystems
+                      </>
+                    )}
                   </Typography>
                 </Alert>
               </Grid>

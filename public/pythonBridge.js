@@ -130,7 +130,7 @@ print(json.dumps(results))
     });
   }
 
-  async generateSyntheticData(files, relationships = [], numRows = null, progressCallback = null) {
+  async generateSyntheticData(files, relationships = [], numRows = null, algorithm = 'GaussianCopula', progressCallback = null) {
     return new Promise((resolve, reject) => {
       // Debug: Log the files parameter
       console.log('generateSyntheticData called with files:', files);
@@ -149,13 +149,29 @@ print(json.dumps(results))
         }
       }
       
+      const progressFile = path.join(__dirname, '..', 'temp', `progress_${Date.now()}.json`);
+      let progressInterval;
+      
       const script = `
 import sys
 import json
+import os
 sys.path.append('${this.pythonPath}')
 from data_processor import DataProcessor
 
 processor = DataProcessor()
+
+# Progress file path
+progress_file = '${progressFile.replace(/\\/g, '/')}'
+
+# Progress callback function
+def progress_callback(percent, message):
+    try:
+        os.makedirs(os.path.dirname(progress_file), exist_ok=True)
+        with open(progress_file, 'w') as f:
+            json.dump({'percent': percent, 'message': message}, f)
+    except Exception as e:
+        print(f"Progress callback error: {e}")
 
 # Load all files
 ${files.map((file, index) => `
@@ -166,9 +182,9 @@ processor.load_csv('${file.path}', 'table_${index}')
 relationships = ${JSON.stringify(relationships)}
 processor.setup_metadata(relationships)
 
-# Generate synthetic data
+# Generate synthetic data with progress callback
 try:
-    result = processor.generate_synthetic_data(${numRows || 'None'})
+    result = processor.generate_synthetic_data(${numRows || 'None'}, '${algorithm}', progress_callback)
     
     # Auto-save to test/generated folder for debugging
     if result['success']:
@@ -187,21 +203,54 @@ try:
     print(json.dumps(result))
 except Exception as e:
     print(json.dumps({'success': False, 'error': str(e)}))
+finally:
+    # Clean up progress file
+    try:
+        if os.path.exists(progress_file):
+            os.remove(progress_file)
+    except:
+        pass
 `;
 
-      // Add timeout to prevent hanging
+      // Add timeout to prevent hanging (increased for CTGAN)
       const timeout = setTimeout(() => {
         console.log('Synthetic data generation timed out');
-        resolve({ success: false, error: 'Synthetic data generation timed out after 60 seconds' });
-      }, 60000);
+        clearInterval(progressInterval);
+        try {
+          if (fs.existsSync(progressFile)) {
+            fs.unlinkSync(progressFile);
+          }
+        } catch (e) {
+          // Ignore cleanup errors
+        }
+        resolve({ success: false, error: 'Synthetic data generation timed out after 10 minutes' });
+      }, 600000); // 10 minutes timeout
 
       const execFile = util.promisify(cp.execFile);
 
       console.log('Running synthetic data generation with execFile...');
       
+      // Create a progress monitoring interval
+      progressInterval = setInterval(() => {
+        try {
+          if (fs.existsSync(progressFile)) {
+            const progressData = JSON.parse(fs.readFileSync(progressFile, 'utf8'));
+            console.log(`Progress: ${progressData.percent}% - ${progressData.message}`);
+            
+            // Send progress to callback if provided
+            if (progressCallback) {
+              progressCallback(progressData);
+            }
+          }
+        } catch (e) {
+          // Ignore progress file read errors
+        }
+      }, 1000); // Check every second
+      
       execFile(this.pythonExecutable, ['-c', script])
         .then(({ stdout, stderr }) => {
           clearTimeout(timeout);
+          clearInterval(progressInterval);
           console.log('Synthetic data generation completed');
           
           if (stderr) {
@@ -241,6 +290,7 @@ except Exception as e:
         })
         .catch((error) => {
           clearTimeout(timeout);
+          clearInterval(progressInterval);
           console.error('Synthetic data generation failed:', error);
           resolve({ success: false, error: `Synthetic data generation failed: ${error.message}` });
         });

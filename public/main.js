@@ -254,12 +254,18 @@ ipcMain.handle('python-analyze-data', async (event, files) => {
   }
 });
 
-ipcMain.handle('python-generate-synthetic', async (event, files, relationships, numRows) => {
+ipcMain.handle('python-generate-synthetic', async (event, files, relationships, numRows, algorithm) => {
   try {
     if (!pythonBridge) {
       return { success: false, error: 'Python bridge not initialized' };
     }
-    return await pythonBridge.generateSyntheticData(files, relationships, numRows);
+    
+    // Create progress callback that sends updates to renderer
+    const progressCallback = (progressData) => {
+      event.sender.send('generation-progress', progressData);
+    };
+    
+    return await pythonBridge.generateSyntheticData(files, relationships, numRows, algorithm, progressCallback);
   } catch (error) {
     return { success: false, error: error.message };
   }
@@ -285,4 +291,9 @@ ipcMain.handle('python-generate-column-plot', async (event, files, syntheticData
   } catch (error) {
     return { success: false, error: error.message };
   }
+});
+
+// Log to terminal from renderer process
+ipcMain.handle('log-to-terminal', async (event, message) => {
+  console.log(`[RENDERER] ${message}`);
 });
