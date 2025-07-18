@@ -10,13 +10,19 @@ import {
   ListItemSecondaryAction,
   IconButton,
   Paper,
-  Alert
+  Alert,
+  Card,
+  CardContent,
+  CardActionArea,
+  Grid
 } from '@mui/material';
 import {
   CloudUpload as UploadIcon,
   TableChart as CsvIcon,
   Delete as DeleteIcon,
-  FolderOpen as FolderIcon
+  FolderOpen as FolderIcon,
+  InsertDriveFile as ExcelIcon,
+  Storage as DatabaseIcon
 } from '@mui/icons-material';
 
 // Access electron API through preload script
@@ -24,6 +30,20 @@ import {
 const FileSelector = ({ onFilesSelected, isProcessing }) => {
   const [selectedFiles, setSelectedFiles] = useState([]);
   const [dragOver, setDragOver] = useState(false);
+
+  // Helper function to get the appropriate icon for a file
+  const getFileIcon = (fileName) => {
+    const extension = fileName.toLowerCase().split('.').pop();
+    switch (extension) {
+      case 'xlsx':
+      case 'xls':
+        return <ExcelIcon color="success" />;
+      case 'csv':
+        return <CsvIcon color="primary" />;
+      default:
+        return <CsvIcon color="primary" />;
+    }
+  };
 
   const handleFileSelect = useCallback(async () => {
     try {
@@ -42,21 +62,6 @@ const FileSelector = ({ onFilesSelected, isProcessing }) => {
     }
   }, []);
 
-  const handleFolderSelect = useCallback(async () => {
-    try {
-      if (!window.electronAPI) {
-        console.error('Electron API not available');
-        return;
-      }
-      const result = await window.electronAPI.selectFolder();
-      if (result && result.length > 0) {
-        // Files now come with name and size already populated from main process
-        setSelectedFiles(prev => [...prev, ...result]);
-      }
-    } catch (error) {
-      console.error('Error selecting folder:', error);
-    }
-  }, []);
 
   const handleRemoveFile = useCallback((index) => {
     setSelectedFiles(prev => prev.filter((_, i) => i !== index));
@@ -77,7 +82,7 @@ const FileSelector = ({ onFilesSelected, isProcessing }) => {
       if (filesWithoutPath.length > 0) {
         // Show error message for drag and drop limitation
         console.error('Drag and drop files are missing path property. Please use the file selection button instead.');
-        alert('Drag and drop is not fully supported. Please use the "Select CSV Files" button to choose your files.');
+        alert('Drag and drop is not fully supported. Please use the "Select Data Files" button to choose your files.');
         return;
       }
       
@@ -120,60 +125,93 @@ const FileSelector = ({ onFilesSelected, isProcessing }) => {
   return (
     <Box sx={{ maxWidth: 800, mx: 'auto' }}>
       <Typography variant="h4" gutterBottom sx={{ fontWeight: 'bold', color: '#333' }}>
-        Select Your Data Files
+        Select Input Data
       </Typography>
       
-      <Typography variant="body1" sx={{ mb: 3, color: '#666' }}>
-        Choose one or more CSV files to generate synthetic data. You can select individual files
-        or browse an entire folder for CSV files.
+      <Typography variant="body1" sx={{ mb: 4, color: '#666' }}>
+        Choose your data source to generate synthetic data. Select from file-based data or database connections.
       </Typography>
 
-      <Paper
-        sx={{
-          p: 4,
-          border: dragOver ? '2px dashed #667eea' : '2px dashed #ccc',
-          borderRadius: 2,
-          textAlign: 'center',
-          cursor: 'pointer',
-          transition: 'all 0.3s ease',
-          backgroundColor: dragOver ? 'rgba(102, 126, 234, 0.05)' : 'transparent',
-          mb: 3
-        }}
-        onDrop={handleDrop}
-        onDragOver={handleDragOver}
-        onDragLeave={handleDragLeave}
-        onClick={handleFileSelect}
-      >
-        <UploadIcon sx={{ fontSize: 48, color: '#667eea', mb: 2 }} />
-        <Typography variant="h6" sx={{ mb: 1 }}>
-          Click to browse for CSV files
-        </Typography>
-        <Typography variant="body2" sx={{ color: '#666' }}>
-          Supports multiple file selection
-        </Typography>
-        <Typography variant="body2" sx={{ color: '#999', mt: 1, fontSize: '0.8rem' }}>
-          Note: Use the buttons below for reliable file selection
-        </Typography>
-      </Paper>
+      <Grid container spacing={3} sx={{ mb: 4 }}>
+        {/* SQL Server Tile */}
+        <Grid item xs={12} md={6}>
+          <Card 
+            sx={{ 
+              height: '200px',
+              opacity: 0.6,
+              cursor: 'not-allowed',
+              border: '2px solid #e0e0e0',
+              transition: 'all 0.3s ease'
+            }}
+          >
+            <CardContent sx={{ 
+              display: 'flex', 
+              flexDirection: 'column', 
+              alignItems: 'center', 
+              justifyContent: 'center',
+              height: '100%',
+              textAlign: 'center'
+            }}>
+              <DatabaseIcon sx={{ fontSize: 64, color: '#bbb', mb: 2 }} />
+              <Typography variant="h5" sx={{ fontWeight: 'bold', color: '#999', mb: 1 }}>
+                SQL Server
+              </Typography>
+              <Typography variant="body2" sx={{ color: '#999' }}>
+                Connect to SQL Server databases
+              </Typography>
+              <Typography variant="caption" sx={{ color: '#999', mt: 1, fontStyle: 'italic' }}>
+                Coming soon
+              </Typography>
+            </CardContent>
+          </Card>
+        </Grid>
 
-      <Box sx={{ display: 'flex', gap: 2, mb: 3 }}>
-        <Button
-          variant="outlined"
-          startIcon={<CsvIcon />}
-          onClick={handleFileSelect}
-          disabled={isProcessing}
-        >
-          Select CSV Files
-        </Button>
-        <Button
-          variant="outlined"
-          startIcon={<FolderIcon />}
-          onClick={handleFolderSelect}
-          disabled={isProcessing}
-        >
-          Browse Folder
-        </Button>
-      </Box>
+        {/* CSV/XLSX Tile */}
+        <Grid item xs={12} md={6}>
+          <Card 
+            sx={{ 
+              height: '200px',
+              cursor: 'pointer',
+              border: '2px solid #667eea',
+              transition: 'all 0.3s ease',
+              '&:hover': {
+                transform: 'translateY(-4px)',
+                boxShadow: '0 8px 25px rgba(102, 126, 234, 0.15)',
+                borderColor: '#5a67d8'
+              }
+            }}
+          >
+            <CardActionArea 
+              onClick={handleFileSelect}
+              disabled={isProcessing}
+              sx={{ height: '100%' }}
+            >
+              <CardContent sx={{ 
+                display: 'flex', 
+                flexDirection: 'column', 
+                alignItems: 'center', 
+                justifyContent: 'center',
+                height: '100%',
+                textAlign: 'center'
+              }}>
+                <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
+                  <CsvIcon sx={{ fontSize: 32, color: '#667eea' }} />
+                  <ExcelIcon sx={{ fontSize: 32, color: '#667eea' }} />
+                </Box>
+                <Typography variant="h5" sx={{ fontWeight: 'bold', color: '#667eea', mb: 1 }}>
+                  CSV / XLSX
+                </Typography>
+                <Typography variant="body2" sx={{ color: '#666' }}>
+                  Upload CSV or Excel files
+                </Typography>
+                <Typography variant="body2" sx={{ color: '#667eea', mt: 1, fontWeight: 'medium' }}>
+                  Click to select files
+                </Typography>
+              </CardContent>
+            </CardActionArea>
+          </Card>
+        </Grid>
+      </Grid>
 
       {selectedFiles.length > 0 && (
         <Paper sx={{ p: 2, mb: 3 }}>
@@ -184,7 +222,7 @@ const FileSelector = ({ onFilesSelected, isProcessing }) => {
             {selectedFiles.map((file, index) => (
               <ListItem key={index} sx={{ py: 1 }}>
                 <ListItemIcon>
-                  <CsvIcon color="primary" />
+                  {getFileIcon(file.name)}
                 </ListItemIcon>
                 <ListItemText
                   primary={file.name}

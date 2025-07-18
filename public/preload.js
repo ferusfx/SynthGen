@@ -20,6 +20,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('python-evaluate-quality', files, syntheticData),
   pythonGenerateColumnPlot: (files, syntheticData, columnName) => 
     ipcRenderer.invoke('python-generate-column-plot', files, syntheticData, columnName),
+  pythonSaveEvaluationReport: (qualityData, filePath) => 
+    ipcRenderer.invoke('python-save-evaluation-report', qualityData, filePath),
   
   // Progress monitoring
   startProgressPolling: (callback) => {

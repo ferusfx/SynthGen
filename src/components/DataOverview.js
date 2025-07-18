@@ -330,7 +330,7 @@ const DataOverview = ({ files, onDataAnalyzed, onComplete, setIsProcessing }) =>
         ensure optimal synthetic data generation.
       </Typography>
 
-      {Object.entries(analysisData).filter(([key]) => key !== '_metadata').map(([tableName, tableData], index) => (
+      {Object.entries(analysisData).filter(([key]) => key !== '_metadata' && key !== '_cleaning').map(([tableName, tableData], index) => (
         <Accordion key={tableName} defaultExpanded={index === 0} sx={{ mb: 2 }}>
           <AccordionSummary expandIcon={<ExpandMoreIcon />}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
@@ -414,13 +414,13 @@ const DataOverview = ({ files, onDataAnalyzed, onComplete, setIsProcessing }) =>
         <Box sx={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
           <Box>
             <Typography variant="body2" color="textSecondary">Total Tables</Typography>
-            <Typography variant="h5">{Object.keys(analysisData).filter(key => key !== '_metadata').length}</Typography>
+            <Typography variant="h5">{Object.keys(analysisData).filter(key => key !== '_metadata' && key !== '_cleaning').length}</Typography>
           </Box>
           <Box>
             <Typography variant="body2" color="textSecondary">Total Columns</Typography>
             <Typography variant="h5">
               {Object.entries(analysisData)
-                .filter(([key]) => key !== '_metadata')
+                .filter(([key]) => key !== '_metadata' && key !== '_cleaning')
                 .reduce((sum, [, table]) => sum + (table.columns?.length || 0), 0)}
             </Typography>
           </Box>
@@ -428,7 +428,7 @@ const DataOverview = ({ files, onDataAnalyzed, onComplete, setIsProcessing }) =>
             <Typography variant="body2" color="textSecondary">Total Rows</Typography>
             <Typography variant="h5">
               {Object.entries(analysisData)
-                .filter(([key]) => key !== '_metadata')
+                .filter(([key]) => key !== '_metadata' && key !== '_cleaning')
                 .reduce((sum, [, table]) => sum + (table.shape?.[0] || 0), 0).toLocaleString()}
             </Typography>
           </Box>
@@ -467,7 +467,53 @@ const DataOverview = ({ files, onDataAnalyzed, onComplete, setIsProcessing }) =>
         </Box>
       )}
 
-      {Object.keys(analysisData).filter(key => key !== '_metadata').length > 1 && (
+      {/* Data Cleaning Results */}
+      {analysisData._cleaning && (
+        <Box sx={{ mt: 4 }}>
+          <Typography variant="h6" gutterBottom>
+            Data Cleaning Results
+          </Typography>
+          {analysisData._cleaning.success ? (
+            <Alert severity="success" sx={{ mb: 2 }}>
+              <Typography variant="body2" sx={{ mb: 1 }}>
+                <strong>Data cleaning completed successfully!</strong>
+              </Typography>
+              {analysisData._cleaning.operations_performed.length > 0 && (
+                <Box sx={{ mt: 1 }}>
+                  <Typography variant="body2" sx={{ mb: 1 }}>
+                    <strong>Operations performed:</strong>
+                  </Typography>
+                  {analysisData._cleaning.operations_performed.map((operation, index) => (
+                    <Typography key={index} variant="caption" sx={{ display: 'block', ml: 2 }}>
+                      • {operation}
+                    </Typography>
+                  ))}
+                </Box>
+              )}
+              {analysisData._cleaning.warnings.length > 0 && (
+                <Box sx={{ mt: 1 }}>
+                  <Typography variant="body2" sx={{ mb: 1 }}>
+                    <strong>Warnings:</strong>
+                  </Typography>
+                  {analysisData._cleaning.warnings.map((warning, index) => (
+                    <Typography key={index} variant="caption" sx={{ display: 'block', ml: 2, color: 'warning.main' }}>
+                      • {warning}
+                    </Typography>
+                  ))}
+                </Box>
+              )}
+            </Alert>
+          ) : (
+            <Alert severity="warning" sx={{ mb: 2 }}>
+              <Typography variant="body2">
+                <strong>Data cleaning encountered issues:</strong> {analysisData._cleaning.error}
+              </Typography>
+            </Alert>
+          )}
+        </Box>
+      )}
+
+      {Object.keys(analysisData).filter(key => key !== '_metadata' && key !== '_cleaning').length > 1 && (
         <Alert severity="info" sx={{ mt: 3 }}>
           <strong>Multiple tables detected!</strong> In the next step, you'll be able to review and confirm 
           relationships between these tables to maintain referential integrity in your synthetic data.
@@ -482,7 +528,7 @@ const DataOverview = ({ files, onDataAnalyzed, onComplete, setIsProcessing }) =>
         <Button
           variant="contained"
           size="large"
-          onClick={onComplete}
+          onClick={() => onComplete(analysisData)}
           sx={{ px: 4 }}
         >
           Continue to Next Step

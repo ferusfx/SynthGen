@@ -129,10 +129,10 @@ ipcMain.handle('create-zip-from-files', async (event, files, outputPath) => {
   }
 });
 
-// Save ZIP file from blob
-ipcMain.handle('save-zip-file', async (event, zipBlob, outputPath) => {
+// Save ZIP file from ArrayBuffer
+ipcMain.handle('save-zip-file', async (event, zipArrayBuffer, outputPath) => {
   try {
-    const buffer = Buffer.from(await zipBlob.arrayBuffer());
+    const buffer = Buffer.from(zipArrayBuffer);
     fs.writeFileSync(outputPath, buffer);
     return { success: true };
   } catch (error) {
@@ -145,7 +145,10 @@ ipcMain.handle('select-files', async () => {
   const result = await dialog.showOpenDialog({
     properties: ['openFile', 'multiSelections'],
     filters: [
-      { name: 'CSV Files', extensions: ['csv'] }
+      { name: 'Data Files', extensions: ['csv', 'xlsx'] },
+      { name: 'CSV Files', extensions: ['csv'] },
+      { name: 'Excel Files', extensions: ['xlsx'] },
+      { name: 'All Files', extensions: ['*'] }
     ]
   });
   
@@ -288,6 +291,17 @@ ipcMain.handle('python-generate-column-plot', async (event, files, syntheticData
       return { success: false, error: 'Python bridge not initialized' };
     }
     return await pythonBridge.generateColumnPlotData(files, syntheticData, columnName);
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('python-save-evaluation-report', async (event, qualityData, filePath) => {
+  try {
+    if (!pythonBridge) {
+      return { success: false, error: 'Python bridge not initialized' };
+    }
+    return await pythonBridge.saveEvaluationReport(qualityData, filePath);
   } catch (error) {
     return { success: false, error: error.message };
   }

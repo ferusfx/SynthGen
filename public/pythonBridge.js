@@ -179,7 +179,7 @@ processor.load_csv('${file.path}', 'table_${index}')
 `).join('')}
 
 # Setup metadata with relationships
-relationships = ${JSON.stringify(relationships)}
+relationships = ${JSON.stringify(relationships).replace(/false/g, 'False').replace(/true/g, 'True').replace(/null/g, 'None')}
 processor.setup_metadata(relationships)
 
 # Generate synthetic data with progress callback
@@ -319,12 +319,17 @@ processor.setup_metadata()
 # Convert synthetic data back to DataFrames and evaluate quality
 try:
     import json as json_module
-    synthetic_data_json = '''${JSON.stringify(syntheticData).replace(/'/g, "\\'")}'''
+    import base64
+    
+    # Use base64 encoding to safely pass JSON data to avoid control character issues
+    synthetic_data_b64 = "${Buffer.from(JSON.stringify(syntheticData)).toString('base64')}"
+    synthetic_data_json = base64.b64decode(synthetic_data_b64).decode('utf-8')
     synthetic_data_dict = json_module.loads(synthetic_data_json)
     result = processor.evaluate_quality_with_data(synthetic_data_dict)
     print(json.dumps(result))
 except Exception as e:
-    print(json.dumps({'success': False, 'error': str(e)}))
+    error_msg = str(e).replace('\\n', ' ').replace('\\r', ' ')
+    print(json.dumps({'success': False, 'error': error_msg}))
 `;
 
       // Add timeout to prevent hanging
@@ -511,6 +516,75 @@ print("Package check complete")
     this.checkPythonPackagesWithExecFile(resolve);
   }
 
+  async saveEvaluationReport(qualityData, filePath) {
+    return new Promise((resolve, reject) => {
+      const script = `
+import sys
+import json
+import base64
+sys.path.append('${this.pythonPath}')
+from data_processor import DataProcessor
+
+processor = DataProcessor()
+
+# Decode and parse quality data
+try:
+    quality_data_b64 = "${Buffer.from(JSON.stringify(qualityData)).toString('base64')}"
+    quality_data_json = base64.b64decode(quality_data_b64).decode('utf-8')
+    quality_data_dict = json.loads(quality_data_json)
+    
+    result = processor.save_evaluation_report(quality_data_dict, '${filePath}')
+    print(json.dumps(result))
+except Exception as e:
+    print(json.dumps({'success': False, 'error': str(e)}))
+`;
+
+      const timeout = setTimeout(() => {
+        resolve({ success: false, error: 'Save operation timed out after 30 seconds' });
+      }, 30000);
+
+      const execFile = util.promisify(cp.execFile);
+      
+      execFile(this.pythonExecutable, ['-c', script])
+        .then(({ stdout, stderr }) => {
+          clearTimeout(timeout);
+          
+          if (stderr) {
+            console.warn('Python stderr:', stderr);
+          }
+          
+          try {
+            const lines = stdout.trim().split('\n');
+            let jsonResult = null;
+            
+            for (let i = lines.length - 1; i >= 0; i--) {
+              const line = lines[i].trim();
+              if (line.startsWith('{')) {
+                try {
+                  jsonResult = JSON.parse(line);
+                  break;
+                } catch (e) {
+                  continue;
+                }
+              }
+            }
+            
+            if (jsonResult) {
+              resolve(jsonResult);
+            } else {
+              resolve({ success: false, error: 'No valid JSON result found in save output' });
+            }
+          } catch (parseErr) {
+            resolve({ success: false, error: `Failed to parse save results: ${parseErr.message}` });
+          }
+        })
+        .catch((error) => {
+          clearTimeout(timeout);
+          resolve({ success: false, error: `Save operation failed: ${error.message}` });
+        });
+    });
+  }
+
   async generateColumnPlotData(files, syntheticData, columnName) {
     return new Promise((resolve, reject) => {
       // Debug: Log the parameters
@@ -546,7 +620,10 @@ processor.setup_metadata()
 # Generate plot data
 try:
     import json as json_module
-    synthetic_data_json = '''${JSON.stringify(syntheticData).replace(/'/g, "\\'")}'''
+    import base64
+    # Use base64 encoding to safely pass JSON data
+    synthetic_data_b64 = '${Buffer.from(JSON.stringify(syntheticData)).toString('base64')}'
+    synthetic_data_json = base64.b64decode(synthetic_data_b64).decode('utf-8')
     synthetic_data_dict = json_module.loads(synthetic_data_json)
     result = processor.generate_column_plot_data(synthetic_data_dict, '${columnName}')
     print(json.dumps(result))

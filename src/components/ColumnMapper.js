@@ -31,7 +31,7 @@ import {
   Delete as DeleteIcon
 } from '@mui/icons-material';
 
-const ColumnMapper = ({ dataOverview, onMappingsComplete }) => {
+const ColumnMapper = ({ dataOverview, files, onMappingsComplete }) => {
   const [selectedColumns, setSelectedColumns] = useState({});
   const [relationships, setRelationships] = useState([]);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -42,8 +42,14 @@ const ColumnMapper = ({ dataOverview, onMappingsComplete }) => {
     childColumn: ''
   });
 
-  const tables = Object.keys(dataOverview || {}).filter(key => key !== '_metadata');
+  const tables = Object.keys(dataOverview || {}).filter(key => key !== '_metadata' && key !== '_cleaning');
   const suggestedRelationships = dataOverview?._metadata?.suggested_relationships || [];
+
+  // Helper function to get display name for tables (use file names instead of table_0, table_1)
+  const getTableDisplayName = (tableName) => {
+    const tableIndex = parseInt(tableName.replace('table_', ''));
+    return files && files[tableIndex] ? files[tableIndex].name.replace('.csv', '').replace('.xlsx', '') : tableName;
+  };
 
   // Auto-populate relationships from suggestions on component mount
   React.useEffect(() => {
@@ -104,6 +110,28 @@ const ColumnMapper = ({ dataOverview, onMappingsComplete }) => {
     setRelationships(prev => prev.filter(rel => rel.id !== id));
   }, []);
 
+  const handleAssignRelationship = useCallback(() => {
+    const selectedTables = Object.keys(selectedColumns).filter(table => selectedColumns[table]);
+    
+    if (selectedTables.length === 2) {
+      const [parentTable, childTable] = selectedTables;
+      const parentColumn = selectedColumns[parentTable];
+      const childColumn = selectedColumns[childTable];
+      
+      setRelationships(prev => [...prev, {
+        id: Date.now(),
+        parent_table: parentTable,
+        parent_key: parentColumn,
+        child_table: childTable,
+        child_key: childColumn,
+        auto_suggested: false
+      }]);
+      
+      // Clear selections
+      setSelectedColumns({});
+    }
+  }, [selectedColumns]);
+
   const handleProceed = useCallback(() => {
     onMappingsComplete(relationships);
   }, [relationships, onMappingsComplete]);
@@ -129,7 +157,7 @@ const ColumnMapper = ({ dataOverview, onMappingsComplete }) => {
         title={
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <TreeIcon color="primary" />
-            <Typography variant="h6">{tableName}</Typography>
+            <Typography variant="h6">{getTableDisplayName(tableName)}</Typography>
             <Chip 
               label={`${tableData.shape[0]} rows`}
               size="small"
@@ -188,7 +216,20 @@ const ColumnMapper = ({ dataOverview, onMappingsComplete }) => {
     </Card>
   );
 
-  if (!dataOverview || tables.length < 2) {
+  if (!dataOverview) {
+    return (
+      <Box sx={{ maxWidth: 800, mx: 'auto', textAlign: 'center', py: 4 }}>
+        <Typography variant="h5" gutterBottom>
+          Loading Data Overview...
+        </Typography>
+        <Typography variant="body1" sx={{ color: '#666', mb: 3 }}>
+          Please wait while we prepare the relationship mapping interface.
+        </Typography>
+      </Box>
+    );
+  }
+
+  if (tables.length < 2) {
     return (
       <Box sx={{ maxWidth: 800, mx: 'auto', textAlign: 'center', py: 4 }}>
         <Typography variant="h5" gutterBottom>
@@ -215,8 +256,7 @@ const ColumnMapper = ({ dataOverview, onMappingsComplete }) => {
       </Typography>
       
       <Typography variant="body1" sx={{ mb: 3, color: '#666' }}>
-        Select columns that represent relationships between your tables. This helps maintain
-        referential integrity in the synthetic data generation process.
+        Select columns that represent relationships between your tables. <strong>Select one column from each of two tables</strong> and click "Create Relationship" to define foreign key relationships. This helps maintain referential integrity in the synthetic data generation process.
       </Typography>
 
       <Alert severity="info" sx={{ mb: 3 }}>
@@ -247,6 +287,33 @@ const ColumnMapper = ({ dataOverview, onMappingsComplete }) => {
         ))}
       </Grid>
 
+      {/* Selection Status and Assign Relationship Button */}
+      {Object.keys(selectedColumns).filter(table => selectedColumns[table]).length > 0 && (
+        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', mb: 3 }}>
+          <Alert severity="info" sx={{ mb: 2 }}>
+            <Typography variant="body2">
+              Selected: {Object.keys(selectedColumns).filter(table => selectedColumns[table]).map(table => 
+                `${getTableDisplayName(table)}.${selectedColumns[table]}`
+              ).join(' and ')}
+              {Object.keys(selectedColumns).filter(table => selectedColumns[table]).length === 1 && 
+                ' (Select one more column from a different table)'}
+            </Typography>
+          </Alert>
+          
+          {Object.keys(selectedColumns).filter(table => selectedColumns[table]).length === 2 && (
+            <Button
+              variant="contained"
+              color="success"
+              startIcon={<AddIcon />}
+              onClick={handleAssignRelationship}
+              sx={{ px: 4, py: 1.5 }}
+            >
+              Create Relationship
+            </Button>
+          )}
+        </Box>
+      )}
+
       <Paper sx={{ p: 3, mb: 3 }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
           <Typography variant="h6">
@@ -273,10 +340,10 @@ const ColumnMapper = ({ dataOverview, onMappingsComplete }) => {
                 <ListItemText
                   primary={
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
-                      <Chip label={rel.parent_table} color="primary" size="small" />
+                      <Chip label={getTableDisplayName(rel.parent_table)} color="primary" size="small" />
                       <Typography variant="body2">{rel.parent_key}</Typography>
                       <LinkIcon sx={{ color: '#666' }} />
-                      <Chip label={rel.child_table} color="secondary" size="small" />
+                      <Chip label={getTableDisplayName(rel.child_table)} color="secondary" size="small" />
                       <Typography variant="body2">{rel.child_key}</Typography>
                       {rel.auto_suggested && (
                         <Chip 
@@ -288,7 +355,7 @@ const ColumnMapper = ({ dataOverview, onMappingsComplete }) => {
                       )}
                     </Box>
                   }
-                  secondary={`Parent table "${rel.parent_table}" → Child table "${rel.child_table}"${rel.auto_suggested ? ' (Auto-detected)' : ''}`}
+                  secondary={`Parent table "${getTableDisplayName(rel.parent_table)}" → Child table "${getTableDisplayName(rel.child_table)}"${rel.auto_suggested ? ' (Auto-detected)' : ''}`}
                 />
                 <Button
                   size="small"
@@ -338,7 +405,7 @@ const ColumnMapper = ({ dataOverview, onMappingsComplete }) => {
                 }))}
               >
                 {tables.map(table => (
-                  <MenuItem key={table} value={table}>{table}</MenuItem>
+                  <MenuItem key={table} value={table}>{getTableDisplayName(table)}</MenuItem>
                 ))}
               </Select>
             </FormControl>
@@ -375,7 +442,7 @@ const ColumnMapper = ({ dataOverview, onMappingsComplete }) => {
                 }))}
               >
                 {tables.filter(table => table !== newRelationship.parentTable).map(table => (
-                  <MenuItem key={table} value={table}>{table}</MenuItem>
+                  <MenuItem key={table} value={table}>{getTableDisplayName(table)}</MenuItem>
                 ))}
               </Select>
             </FormControl>

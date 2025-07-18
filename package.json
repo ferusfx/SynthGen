@@ -14,7 +14,7 @@
     "eject": "react-scripts eject",
     "electron-pack": "electron-builder",
     "preelectron-pack": "npm run build",
-    "setup-python": "python3 -m pip install --user sdv pandas numpy matplotlib seaborn"
+    "setup-python": "python3 -m pip install --user 'sdv[excel]' pandas numpy matplotlib seaborn openpyxl"
   },
   "keywords": [
     "synthetic-data",

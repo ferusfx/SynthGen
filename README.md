@@ -10,14 +10,15 @@ SynthGen is a comprehensive Electron-based desktop application that generates hi
 
 ## 🌟 Key Features
 
-- **Multi-Format Support**: Handles CSV files with automatic delimiter detection
-- **Dual Synthesis Modes**: Single-table (Gaussian Copula) and multi-table (HMA) synthesis
-- **Auto-Metadata Detection**: Intelligent column type and relationship detection
-- **Advanced Quality Assessment**: Comprehensive quality metrics, privacy evaluation, and SDV diagnostics
-- **Data Visualization**: Real vs synthetic data comparison charts with column-level analysis
-- **Export Flexibility**: Download synthetic data as CSV/ZIP or detailed quality reports as JSON
-- **Interactive Quality Metrics**: Contextual tooltips and detailed explanations for all scores
+- **Multi-Format Support**: Handles CSV and XLSX files with automatic delimiter detection
+- **Dual Synthesis Modes**: Single-table (Gaussian Copula, CTGAN) and multi-table (HMA) synthesis
+- **Auto-Metadata Detection**: Intelligent column type and relationship detection with SDV compliance
+- **Advanced Quality Assessment**: Comprehensive SDV diagnostics, quality metrics, and privacy evaluation
+- **Data Visualization**: Real vs synthetic data comparison charts with multi-table plotting support
+- **Export Flexibility**: Download realistic synthetic data as CSV with original file names
+- **Interactive Quality Metrics**: Detailed SDV diagnostic tiles with column-level insights
 - **Privacy-First**: Generate synthetic data without exposing original sensitive information
+- **Tile-Based Interface**: Modern, intuitive file selection with SQL Server integration ready
 - **Cross-Platform**: Desktop application for Windows, macOS, and Linux
 
 ## 📋 Table of Contents
@@ -79,16 +80,16 @@ npm run electron-dev
 ## 🏃 Quick Start
 
 1. **Launch SynthGen** - Run `npm start`
-2. **Select Files** - Choose your CSV file(s) or browse entire folders
+2. **Select Input Data** - Choose CSV/XLSX files through the modern tile interface
 3. **Review Data** - Check auto-detected column types and structure
 4. **Map Relationships** - Define foreign key relationships (multi-table only)
-5. **Generate Synthetic Data** - Configure parameters and create synthetic datasets
-6. **Quality Assessment** - Review quality scores and download results
+5. **Generate Synthetic Data** - Configure algorithms and create realistic synthetic datasets
+6. **Evaluation** - Review SDV diagnostics, quality scores, and visualization plots
 
 ### Example Workflow
 
 ```
-fruit.csv (original) → Analysis → Synthesis → Quality Report → synthetic_fruit.csv
+hotels.csv + guests.csv → Analysis → HMA Synthesis → SDV Evaluation → sd_hotels.csv + sd_guests.csv
 ```
 
 ## 🔧 How It Works
@@ -226,47 +227,48 @@ app/
 ### Main Interface Components
 
 #### **Sidebar Navigation**
-- **Select Files**: File picker and folder browser
+- **Select Input Data**: Tile-based interface with SQL Server and CSV/XLSX options
 - **Data Overview**: Structure analysis and column details
 - **Map Relationships**: Foreign key definition (multi-table)
 - **Generate Data**: Synthesis configuration and execution
-- **Quality Report**: Assessment metrics and downloads
+- **Evaluation**: SDV diagnostics, quality assessment, and visualization
 
 #### **Step-by-Step Workflow**
 
-1. **File Selection**
+1. **Select Input Data**
    ```
-   Supported: .csv files
-   Features: Drag & drop, folder browsing, multi-selection
+   Supported: .csv and .xlsx files
+   Interface: Modern tile-based selection (CSV/XLSX, SQL Server ready)
+   Features: Multi-file selection with real file names
    ```
 
 2. **Data Overview**
    ```
    Displays: Column types, sample data, null counts, unique values
    Auto-detects: Delimiters, data types, potential relationships
+   SDV Compliance: Native metadata detection and optimization
    ```
 
 3. **Relationship Mapping** (Multi-table only)
    ```
-   Define: Parent-child relationships
-   Specify: Foreign key columns
-   Validate: Referential integrity
+   Define: Parent-child relationships with real table names
+   Specify: Foreign key columns with validation
+   Validate: Referential integrity for HMA synthesis
    ```
 
-4. **Synthesis Panel**
+4. **Generate Data**
    ```
-   Configure: Record count, algorithm selection
-   Monitor: Real-time progress tracking
-   Preview: Generation parameters
+   Algorithms: Gaussian Copula (fast), CTGAN (deep learning), HMA (multi-table)
+   Progress: Real-time tracking with time-based estimation
+   Output: Realistic synthetic data without SDV IDs
    ```
 
-5. **Quality Report**
+5. **Evaluation**
    ```
-   Metrics: Statistical fidelity, privacy protection, utility scores
-   SDV Diagnostics: Data validity and structure analysis with column-level details
-   Visualization: Real vs synthetic data comparison charts
-   Interactive Help: Click info icons for detailed metric explanations
-   Downloads: Synthetic dataset (CSV/ZIP), quality report (JSON)
+   SDV Diagnostics: Data Validity, Data Structure, Relationship Validity scores
+   Quality Metrics: Column Shapes, Column Pair Trends, Cardinality analysis
+   Visualization: Multi-table plotting support with column-level comparisons
+   Downloads: Synthetic datasets with original file names, evaluation reports
    ```
 
 ## 🏗️ Technical Architecture
@@ -304,14 +306,14 @@ synthgen/
 ├── src/
 │   ├── App.js               # Main React component
 │   ├── components/          # UI components
-│   │   ├── FileSelector.js
-│   │   ├── DataOverview.js
-│   │   ├── ColumnMapper.js
-│   │   ├── SynthesisPanel.js
-│   │   └── QualityReport.js
+│   │   ├── FileSelector.js  # Tile-based file selection
+│   │   ├── DataOverview.js  # Data structure analysis
+│   │   ├── ColumnMapper.js  # Relationship mapping
+│   │   ├── SynthesisPanel.js # Algorithm configuration
+│   │   └── Evaluation.js    # SDV diagnostics & quality
 │   └── utils/
 ├── python/
-│   ├── data_processor.py    # Core data processing
+│   ├── data_processor.py    # Core SDV integration
 │   └── setup.py            # Environment setup
 ├── package.json            # Node.js dependencies
 └── CLAUDE.md              # Development instructions
@@ -389,9 +391,6 @@ npm start
 
 # Package for distribution
 npm run electron-pack
-
-# Run tests
-npm test
 
 # Build only (without starting)
 npm run build
@@ -499,6 +498,32 @@ This project is licensed under the ISC License - see the [LICENSE](LICENSE) file
 - **[Electron](https://electronjs.org)** - Cross-platform desktop app framework
 - **[React](https://reactjs.org)** - User interface library
 - **[Material-UI](https://mui.com)** - React component library
+
+## 🆕 Latest Improvements
+
+### Enhanced SDV Compliance (v1.2)
+
+- **Realistic Data Generation**: Fixed synthetic data export to generate realistic values instead of SDV IDs like "sdv-id-UpYymO"
+- **Multi-Table Plotting**: Implemented full support for visualization across multiple tables
+- **Table Name Mapping**: All diagnostic details now use real table names instead of "table_0", "table_1"
+- **Score Calculation**: Fixed Data Structure and Relationship Validity scores to match detail table averages
+- **Plot Generation**: Resolved JSON parsing errors with base64 encoding for safe data transfer
+
+### UI/UX Enhancements
+
+- **Tile-Based Interface**: Modern file selection with CSV/XLSX and SQL Server tiles
+- **Streamlined Navigation**: Removed redundant components and aligned form controls
+- **Comprehensive Evaluation**: SDV diagnostics with Data Validity, Data Structure, and Relationship Validity
+- **Interactive Visualizations**: Column-level comparison charts with error handling
+
+### Technical Improvements
+
+- **Progress Tracking**: Fixed progress bar to start at 0% with accurate time estimation
+- **API Completeness**: Added missing save evaluation report functionality with score accuracy
+- **Error Handling**: Enhanced plot generation with base64 encoding and multi-table support
+- **File Naming**: Synthetic data exports use original file names (sd_hotels.csv, sd_guests.csv)
+- **Score Consistency**: Evaluation report JSON now matches UI scorecard exactly
+- **ZIP Downloads**: Fixed ArrayBuffer handling for synthetic dataset downloads
 
 ---
 

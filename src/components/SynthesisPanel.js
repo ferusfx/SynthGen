@@ -11,19 +11,15 @@ import {
   Alert,
   Chip,
   Grid,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  List,
-  ListItem,
-  ListItemText,
-  CircularProgress
+  CircularProgress,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem
 } from '@mui/material';
 import {
   PlayArrow as PlayIcon,
   Download as DownloadIcon,
-  Settings as SettingsIcon,
   CheckCircle as CheckIcon,
   Error as ErrorIcon
 } from '@mui/icons-material';
@@ -53,7 +49,6 @@ const SynthesisPanel = ({ files, dataOverview, columnMappings, onSynthesisComple
   const [progressMessage, setProgressMessage] = useState('');
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
-  const [showSettings, setShowSettings] = useState(false);
 
   const handleGenerate = useCallback(async () => {
     setGenerating(true);
@@ -72,7 +67,7 @@ const SynthesisPanel = ({ files, dataOverview, columnMappings, onSynthesisComple
         parseInt(generationParams.numRows) : 
         null; // Use original dataset size
 
-      setProgress(20);
+      setProgress(0);
       setProgressMessage('Starting data generation...');
 
       // Start progress polling for real-time updates
@@ -104,7 +99,8 @@ const SynthesisPanel = ({ files, dataOverview, columnMappings, onSynthesisComple
         ...generationResult,
         generationParams,
         timestamp: new Date().toISOString(),
-        originalFiles: files.map(f => f.name)
+        originalFiles: files.map(f => f.name),
+        columnMappings: columnMappings // Include column mappings for evaluation
       };
 
       setResult(processedResult);
@@ -158,7 +154,7 @@ const SynthesisPanel = ({ files, dataOverview, columnMappings, onSynthesisComple
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `synthetic_${tableName}_${new Date().toISOString().slice(0, 10)}.csv`;
+      link.download = `sd_${tableName}_${new Date().toISOString().slice(0, 10)}.csv`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -177,15 +173,8 @@ const SynthesisPanel = ({ files, dataOverview, columnMappings, onSynthesisComple
     return (
     <Card sx={{ mb: 3 }}>
       <CardContent>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+        <Box sx={{ mb: 2 }}>
           <Typography variant="h6">Generation Settings</Typography>
-          <Button
-            startIcon={<SettingsIcon />}
-            onClick={() => setShowSettings(true)}
-            size="small"
-          >
-            Advanced
-          </Button>
         </Box>
 
         <Grid container spacing={2}>
@@ -201,22 +190,11 @@ const SynthesisPanel = ({ files, dataOverview, columnMappings, onSynthesisComple
             />
           </Grid>
           <Grid item xs={12} md={4}>
-            <Box>
-              <Typography variant="body2" color="textSecondary" sx={{ mb: 1 }}>
-                Algorithm
-              </Typography>
-              <select
-                style={{
-                  width: '100%',
-                  padding: '16.5px 14px',
-                  fontSize: '16px',
-                  border: '1px solid rgba(0, 0, 0, 0.23)',
-                  borderRadius: '4px',
-                  backgroundColor: '#fff',
-                  cursor: 'pointer',
-                  fontFamily: 'inherit'
-                }}
+            <FormControl fullWidth>
+              <InputLabel>Algorithm</InputLabel>
+              <Select
                 value={algorithm}
+                label="Algorithm"
                 onChange={(e) => {
                   const newValue = e.target.value;
                   setAlgorithm(newValue);
@@ -224,14 +202,14 @@ const SynthesisPanel = ({ files, dataOverview, columnMappings, onSynthesisComple
               >
                 {files && files.length === 1 ? (
                   <>
-                    <option value="GaussianCopula">Gaussian Copula (Recommended)</option>
-                    <option value="CTGAN">CTGAN (Deep Learning)</option>
+                    <MenuItem value="GaussianCopula">Gaussian Copula (Recommended)</MenuItem>
+                    <MenuItem value="CTGAN">CTGAN (Deep Learning)</MenuItem>
                   </>
                 ) : (
-                  <option value="HMA">HMA (Multi-table)</option>
+                  <MenuItem value="HMA">HMA (Multi-table)</MenuItem>
                 )}
-              </select>
-            </Box>
+              </Select>
+            </FormControl>
           </Grid>
           <Grid item xs={12} md={4}>
             <Box sx={{ pt: 2 }}>
@@ -406,60 +384,6 @@ const SynthesisPanel = ({ files, dataOverview, columnMappings, onSynthesisComple
         </Box>
       )}
 
-      {/* Advanced Settings Dialog */}
-      <Dialog open={showSettings} onClose={() => setShowSettings(false)} maxWidth="md" fullWidth>
-        <DialogTitle>Advanced Generation Settings</DialogTitle>
-        <DialogContent>
-          <Box sx={{ pt: 2 }}>
-            <Typography variant="subtitle1" gutterBottom>
-              Table Relationships ({columnMappings.length})
-            </Typography>
-            
-            {columnMappings.length === 0 ? (
-              <Alert severity="info">
-                No relationships defined. Tables will be generated independently.
-              </Alert>
-            ) : (
-              <List>
-                {columnMappings.map((mapping, index) => (
-                  <ListItem key={index}>
-                    <ListItemText
-                      primary={`${mapping.parent_table}.${mapping.parent_key} → ${mapping.child_table}.${mapping.child_key}`}
-                      secondary="Foreign key relationship"
-                    />
-                  </ListItem>
-                ))}
-              </List>
-            )}
-
-            <Typography variant="subtitle1" sx={{ mt: 3, mb: 1 }}>
-              Generation Parameters
-            </Typography>
-            
-            <Grid container spacing={2}>
-              <Grid item xs={12}>
-                <Alert severity="info">
-                  <Typography variant="body2">
-                    {files && files.length === 1 ? (
-                      <>
-                        <strong>Gaussian Copula:</strong> Best for mixed data types with complex correlations<br/>
-                        <strong>CTGAN:</strong> Deep learning approach using GANs, excellent for tabular data but requires more computational resources
-                      </>
-                    ) : (
-                      <>
-                        <strong>HMA (Hierarchical Multi-table Algorithm):</strong> Best for related tables with foreign key relationships and complex data ecosystems
-                      </>
-                    )}
-                  </Typography>
-                </Alert>
-              </Grid>
-            </Grid>
-          </Box>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setShowSettings(false)}>Close</Button>
-        </DialogActions>
-      </Dialog>
     </Box>
   );
 };

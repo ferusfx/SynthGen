@@ -6,7 +6,7 @@ import DataOverview from './components/DataOverview';
 // import MetadataReview from './components/MetadataReview';
 import ColumnMapper from './components/ColumnMapper';
 import SynthesisPanel from './components/SynthesisPanel';
-import QualityReport from './components/QualityReport';
+import Evaluation from './components/Evaluation';
 import Header from './components/Header';
 import Sidebar from './components/Sidebar';
 import './App.css';
@@ -31,15 +31,15 @@ function App() {
   const [dataOverview, setDataOverview] = useState(null);
   const [columnMappings, setColumnMappings] = useState([]);
   const [synthesisResult, setSynthesisResult] = useState(null);
-  const [qualityReport, setQualityReport] = useState(null);
+  const [evaluationReport, setEvaluationReport] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
 
   const steps = [
-    { title: 'Select Files', description: 'Choose CSV files for synthesis' },
+    { title: 'Select input data', description: 'Choose data source for synthesis' },
     { title: 'Data Overview', description: 'Review data structure and types' },
     { title: 'Map Relationships', description: 'Define column relationships across tables' },
     { title: 'Generate Data', description: 'Create synthetic datasets' },
-    { title: 'Quality Report', description: 'Review synthesis quality and privacy scores' }
+    { title: 'Evaluation', description: 'Review synthesis quality and privacy scores' }
   ];
 
   const handleFilesSelected = useCallback((selectedFiles) => {
@@ -55,13 +55,18 @@ function App() {
     setCurrentStep(1);
   }, []);
 
-  const handleDataOverviewComplete = useCallback(() => {
+  const handleDataOverviewComplete = useCallback((analysisData) => {
+    // Ensure dataOverview is set if analysisData is provided
+    if (analysisData && !dataOverview) {
+      setDataOverview(analysisData);
+    }
+    
     if (files.length > 1) {
       setCurrentStep(2); // Go to relationships mapping
     } else {
       setCurrentStep(3); // Skip to Generate Data for single file
     }
-  }, [files.length]);
+  }, [files.length, dataOverview]);
 
   const handleMappingsComplete = useCallback((mappings) => {
     setColumnMappings(mappings);
@@ -73,8 +78,8 @@ function App() {
     setCurrentStep(4);
   }, []);
 
-  const handleQualityComplete = useCallback((report) => {
-    setQualityReport(report);
+  const handleEvaluationComplete = useCallback((report) => {
+    setEvaluationReport(report);
   }, []);
 
   const renderCurrentStep = () => {
@@ -99,6 +104,7 @@ function App() {
         return (
           <ColumnMapper
             dataOverview={dataOverview}
+            files={files}
             onMappingsComplete={handleMappingsComplete}
           />
         );
@@ -114,9 +120,9 @@ function App() {
         );
       case 4:
         return (
-          <QualityReport
+          <Evaluation
             synthesisResult={synthesisResult}
-            onQualityComplete={handleQualityComplete}
+            onEvaluationComplete={handleEvaluationComplete}
             files={files}
           />
         );
