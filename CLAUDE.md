@@ -45,17 +45,21 @@ SynthGen is an Electron-based desktop application for generating synthetic data 
 - Creates BrowserWindow instances
 - Handles application lifecycle events
 - Manages file dialogs and system integration
-- Provides IPC handlers for file operations
+- Provides IPC handlers for file operations and progress tracking
+- Forwards real-time progress updates from Python backend to renderer
 
 **Renderer Process (React App)**:
 - Step-based UI for guiding users through the synthetic data generation process
 - Material-UI components for modern, responsive interface
-- Communication with Python backend via python-shell
+- Real-time progress tracking with live updates during data generation
+- Communication with Python backend via IPC events
+- Run python commands always starting with `python3` as we are on MacOS
 
 **Python Backend**:
 - SDV library integration for synthetic data generation
 - Data analysis and quality assessment
 - Support for single-table and multi-table synthesis
+- Time-based progress tracking with adaptive estimation for CTGAN training
 
 ## Development Setup
 
@@ -65,13 +69,35 @@ SynthGen is an Electron-based desktop application for generating synthetic data 
 4. For development: `npm run electron-dev` (automatically handles React + Electron)
 5. For production: `npm start` (automatically builds then runs Electron)
 
+## Supported Algorithms
+
+**Single-Table Synthesis**:
+- **Gaussian Copula** (Recommended): Best for mixed data types with complex correlations
+- **CTGAN** (Deep Learning): GAN-based approach excellent for tabular data, requires more computational resources
+
+**Multi-Table Synthesis**:
+- **HMA** (Hierarchical Multi-table Algorithm): Best for related tables with foreign key relationships
+
 ## Usage Workflow
 
 1. **File Selection**: Choose CSV files or browse entire folders
 2. **Data Analysis**: Review data structure, types, and sample data  
 3. **Relationship Mapping**: Define foreign key relationships between tables (multi-table only)
-4. **Data Generation**: Configure parameters and generate synthetic data with progress tracking
+4. **Data Generation**: Configure parameters and generate synthetic data with real-time progress tracking
 5. **Quality Assessment**: Review quality scores, privacy metrics, and download results
+
+## Recent Improvements
+
+**Progress Tracking (Latest)**:
+- Real-time progress updates for all synthesis algorithms
+- Time-based estimation with adaptive scaling for CTGAN training
+- Informative progress messages showing remaining time and training phases
+- Extended timeout (10 minutes) for complex CTGAN training sessions
+
+**UI Enhancements**:
+- Dynamic algorithm selection based on file count (single vs multi-table)
+- Native HTML dropdown for better compatibility in Electron environment
+- Improved error handling and user feedback
 
 ## Security Note
 
